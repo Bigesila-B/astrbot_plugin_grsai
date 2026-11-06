@@ -1,0 +1,6 @@
+name: astrbot_plugin_grsai
+display_name: Grsai 图像生成
+desc: 调用 Grsai API 进行文生图和改图。支持「GPT生图」和「GPT改图」指令。
+version: v1.0.1
+author: Bigesila-B
+repo: https://github.com/Bigesila-B/astrbot_plugin_grsai
