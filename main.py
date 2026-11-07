@@ -61,7 +61,7 @@ def _ratio_to_float(ratio_str: str) -> float | None:
     "astrbot_plugin_grsai",
     "Bigesila-B",
     "Grsai 图像生成插件",
-    "1.0.0",
+    "1.0.2",
     "https://github.com/Bigesila-B/astrbot_plugin_grsai",
 )
 class GrsaiPlugin(Star):
