@@ -84,12 +84,12 @@
   "presets": {
     "description": "自定义预设",
     "type": "template_list",
-    "hint": "点击 + 添加新预设。预设通过 LLM 分析图片后自动生成改图提示词",
+    "hint": "点击 + 添加新预设。LLM 可选，地址和 Key 都留空时，预设提示词直接交给 Grsai 模型。",
     "default": [],
     "templates": {
       "preset_item": {
         "name": "预设项",
-        "hint": "配置一个自定义预设（触发词 + LLM + 提示词 + 生图模型）",
+        "hint": "配置触发词、预设提示词和生图模型，可选用 LLM 优化提示词。",
         "items": {
           "trigger": {
             "description": "触发词",
@@ -104,19 +104,19 @@
             "default": ""
           },
           "llm_url": {
-            "description": "LLM API 地址",
+            "description": "LLM API 地址（可选）",
             "type": "string",
             "hint": "视觉语言模型 API 地址（OpenAI 兼容格式），如 https://api.openai.com/v1",
             "default": ""
           },
           "llm_apikey": {
-            "description": "LLM API Key",
+            "description": "LLM API Key（可选）",
             "type": "string",
-            "hint": "视觉语言模型的 API Key",
+            "hint": "与 LLM API 地址一起填写或一起留空。",
             "default": ""
           },
           "llm_model": {
-            "description": "LLM 模型 ID",
+            "description": "LLM 模型 ID（可选）",
             "type": "string",
             "hint": "需支持视觉识别，如 gpt-4o、qwen-vl-max",
             "default": "gpt-4o"
@@ -124,7 +124,7 @@
           "preset_prompt": {
             "description": "预设提示词",
             "type": "text",
-            "hint": "发给语言模型的指令，用于分析图片并生成改图提示词",
+            "hint": "配置了 LLM 时用来生成改图提示词；未配置 LLM 时直接用来生图或改图。",
             "default": ""
           }
         }

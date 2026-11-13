@@ -61,7 +61,7 @@ def _ratio_to_float(ratio_str: str) -> float | None:
     "astrbot_plugin_grsai",
     "Bigesila-B",
     "Grsai 图像生成插件",
-    "1.0.2",
+    "1.0.3",
     "https://github.com/Bigesila-B/astrbot_plugin_grsai",
 )
 class GrsaiPlugin(Star):
@@ -221,7 +221,8 @@ class GrsaiPlugin(Star):
         lines = ["📋 当前预设："]
         for p in self._presets:
             trigger = p.get("trigger", "?")
-            model = p.get("llm_model", "?")
+            use_llm = bool(p.get("llm_url") or p.get("llm_apikey"))
+            model = (p.get("llm_model") or "gpt-4o") if use_llm else "直接生图"
             prompt_preview = p.get("preset_prompt", "")[:40]
             lines.append(f"  • {trigger} → {model} | {prompt_preview}...")
         yield event.plain_result("\n".join(lines))
@@ -492,15 +493,13 @@ class GrsaiPlugin(Star):
         trigger = preset["trigger"]
         llm_url = preset.get("llm_url", "").strip()
         llm_apikey = preset.get("llm_apikey", "").strip()
-        llm_model = preset.get("llm_model", "gpt-4o").strip()
+        llm_model = preset.get("llm_model", "").strip() or "gpt-4o"
         preset_prompt = preset.get("preset_prompt", "").strip()
         model_trigger = preset.get("model_trigger", "").strip()
 
-        if not llm_url:
-            yield event.plain_result(f"❌ 预设「{trigger}」未配置 LLM 地址")
-            return
-        if not llm_apikey:
-            yield event.plain_result(f"❌ 预设「{trigger}」未配置 LLM API Key")
+        use_llm = bool(llm_url or llm_apikey)
+        if use_llm and not (llm_url and llm_apikey):
+            yield event.plain_result(f"❌ 预设「{trigger}」的 LLM 地址和 API Key 请一起填写或一起留空")
             return
         if not preset_prompt:
             yield event.plain_result(f"❌ 预设「{trigger}」未配置提示词预设")
@@ -524,31 +523,30 @@ class GrsaiPlugin(Star):
             extra_text = ""
 
         images = await self._extract_images(event)
-        if not images:
+        if use_llm and not images:
             yield event.plain_result(f"❌ 请附带至少一张图片\n格式：{trigger} [附加说明] + 图片")
             return
 
-        llm_prompt = f"{preset_prompt}\n\n用户附加要求：{extra_text}" if extra_text else preset_prompt
-        llm_images = [self._compress_for_llm(img) for img in images]
-
+        extra_text, custom_ratio = self._parse_prompt_and_ratio(extra_text)
+        prompt = f"{preset_prompt}\n\n用户附加要求：{extra_text}" if extra_text else preset_prompt
         yield event.plain_result(f"⏳ 正在生成「{trigger}」，请稍候...")
 
-        llm_result = await self._call_llm_vision(llm_url, llm_apikey, llm_model, llm_prompt, llm_images)
+        if use_llm:
+            llm_images = [self._compress_for_llm(img) for img in images]
+            prompt = await self._call_llm_vision(llm_url, llm_apikey, llm_model, prompt, llm_images)
+            if prompt and prompt.startswith(("LLM 错误", "LLM 调用失败")):
+                yield event.plain_result(f"❌ {prompt}")
+                return
+            if not prompt or not prompt.strip():
+                yield event.plain_result("❌ 语言模型未返回有效提示词，请检查 LLM 配置或图片是否可识别")
+                return
 
-        if llm_result.startswith("LLM 错误") or llm_result.startswith("LLM 调用失败"):
-            yield event.plain_result(f"❌ {llm_result}")
-            return
-        if not llm_result or not llm_result.strip():
-            yield event.plain_result("❌ 语言模型未返回有效提示词，请检查 LLM 配置或图片是否可识别")
-            return
+        if not custom_ratio and images:
+            custom_ratio = await self._get_image_ratio_from_base64(images[0], gen_model)
+        aspect_ratio = self._resolve_aspect_ratio(custom_ratio, gen_model)
 
-        # 按原图比例生成
-        img_ratio = await self._get_image_ratio_from_base64(images[0], gen_model)
-        aspect_ratio = self._resolve_aspect_ratio(img_ratio, gen_model) if img_ratio else self._resolve_aspect_ratio(None, gen_model)
-
-        # 调用生图模型改图
         result, retries = await self._call_api_with_violation_retry(
-            llm_result, images=images, aspect_ratio=aspect_ratio, model=gen_model)
+            prompt, images=images, aspect_ratio=aspect_ratio, model=gen_model)
 
         if retries > 0:
             yield event.plain_result(f"🔄 内容安全审核触发，已自动重试 {retries} 次")
